@@ -197,9 +197,7 @@ void System::GetHardware(
   GetSystemInfo(&sysinfo);
   ncores = static_cast<int>(sysinfo.dwNumberOfProcessors);
   return;
-#endif
-
-#ifdef __APPLE__
+#elif defined __APPLE__
   // The code for Mac OS X was suggested by Matthew Kidd.
 
   // This is physical memory, rather than "free" memory as below 
@@ -220,9 +218,7 @@ void System::GetHardware(
 
   ncores = sysconf(_SC_NPROCESSORS_ONLN);
   return;
-#endif
-
-#ifdef __linux__
+#elif defined __linux__
   // Use half of the physical memory
   long pages = sysconf (_SC_PHYS_PAGES);
   long pagesize = sysconf (_SC_PAGESIZE);
@@ -233,6 +229,15 @@ void System::GetHardware(
 
   ncores = sysconf(_SC_NPROCESSORS_ONLN);
   return;
+#elif defined __EMSCRIPTEN__
+  // WASM is currently 32bit so max of 4GB, but some older
+  // implementations only allow 2GB so stick to this
+  kilobytesFree = 2 * 1024 * 1024;
+  // Threading not yet supported to always leave ncores as 1
+  ncores= 1;
+  return;
+#else
+#error "Unsupported system"
 #endif
 }
 

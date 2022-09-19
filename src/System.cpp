@@ -22,6 +22,10 @@
 #include "Scheduler.h"
 #include "ThreadMgr.h"
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten/val.h>
+#endif
+
 extern Scheduler scheduler;
 extern Memory memory;
 extern ThreadMgr threadMgr;
@@ -33,7 +37,8 @@ const vector<string> DDS_SYSTEM_PLATFORM =
   "Windows",
   "Cygwin",
   "Linux",
-  "Apple"
+  "Apple",
+  "WASM"
 };
 
 const vector<string> DDS_SYSTEM_COMPILER =
@@ -42,7 +47,8 @@ const vector<string> DDS_SYSTEM_COMPILER =
   "Microsoft Visual C++",
   "MinGW",
   "GNU g++",
-  "clang"
+  "clang",
+  "emscripten"
 };
 
 const vector<string> DDS_SYSTEM_CONSTRUCTOR =
@@ -232,6 +238,35 @@ void System::GetHardware(
     kilobytesFree = 1024 * 1024; // guess 1GB
 
   ncores = sysconf(_SC_NPROCESSORS_ONLN);
+  return;
+#endif
+
+#ifdef __EMSCRIPTEN__
+  // In Chrome based browsers, we can query for the amount of memory available
+  // and reserve half (as for linux systems).
+  // If not available, fall back to a default of 2GB
+  try {
+    using emscripten::val;
+    val performance = val::global("performance");
+    val heapSize = performance["memory"]["jsHeapSizeLimit"];
+    kilobytesFree = heapSize.as<unsigned long long>();
+  }
+  catch (const std::exception& err) {
+    kilobytesFree = 2 * 1024 * 1024;
+  }
+
+  // Querying for number of logical cores should be possible in every browser
+  // except internet explorer. If this fails, we default to 4 which should
+  // be fewer than most modern CPUs contain, and isn't too high as to warrant
+  // too much context switching for CPUs with fewer cores.
+  try {
+    val navigator = val::global("navigator");
+    val hardwareConcurrency = navigator["hardwareConcurrency"];
+    ncores = hardwareConcurrency.as<int>();
+  }
+  catch (const std::exception& err) {
+    ncores = 4;
+  }
   return;
 #endif
 }
@@ -645,6 +680,8 @@ string System::GetSystem(int& sys) const
   sys = 3;
 #elif defined(__APPLE__)
   sys = 4;
+#elif defined(__EMSCRIPTEN__)
+  sys = 5;
 #else
   sys = 0;
 #endif
@@ -694,6 +731,8 @@ string System::GetCompiler(int& comp) const
   comp = 4; // Out-of-order on purpose
 #elif defined(__GNUC__)
   comp = 3;
+#elif defined(__EMSCRIPTEN__)
+  comp = 5;
 #else
   comp = 0;
 #endif

@@ -242,11 +242,11 @@ void System::GetHardware(
 #endif
 
 #ifdef __EMSCRIPTEN__
+  using emscripten::val;
   // In Chrome based browsers, we can query for the amount of memory available
   // and reserve half (as for linux systems).
   // If not available, fall back to a default of 2GB
   try {
-    using emscripten::val;
     val performance = val::global("performance");
     val heapSize = performance["memory"]["jsHeapSizeLimit"];
     kilobytesFree = heapSize.as<unsigned long long>();
